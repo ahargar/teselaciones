@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teselaciones - Alejandro de Haro García</title>
+    <style>
+        :root { --bg: #0f172a; --panel: rgba(15, 23, 42, 0.95); --text: #e2e8f0; --border: #334155; }
+        body { margin: 0; overflow: hidden; background: var(--bg); font-family: sans-serif; color: var(--text); }
+        #controls {
+            position: absolute; top: 20px; left: 20px; width: 280px;
+            background: var(--panel); padding: 15px 20px; border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            max-height: 90vh; 
+            display: flex; flex-direction: column;
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        .panel-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; cursor: pointer;
+        }
+        h3 { margin: 0; color: #38bdf8; font-size: 1.1rem; }
+        #toggleBtn {
+            background: transparent; border: 1px solid var(--border); color: var(--text);
+            width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+        }
+        #toggleBtn:hover { background: rgba(255,255,255,0.1); }
+
+        #controlsContent {
+            overflow-y: auto;
+            scrollbar-width: thin; scrollbar-color: #4b5563 transparent;
+        }
+        
+        #controls.minimized #controlsContent { display: none; }
+        #controls.minimized { width: auto; min-width: 180px; max-height: 60px; }
+        #controls.minimized .panel-header { margin-bottom: 0; }
+
+        select, input[type="range"] { width: 100%; margin-bottom: 12px; cursor: pointer; background: #1e293b; color: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 6px; box-sizing: border-box; }
+        label { display: block; margin-bottom: 5px; font-size: 0.8rem; color: #94a3b8; }
+        .hint { font-size: 0.85rem; color: #93c5fd; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px; line-height: 1.5; font-weight: 500; }
+        
+        .color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+        .color-item { 
+            display: flex; align-items: center; gap: 8px; 
+            font-size: 0.75rem; color: #cbd5e1; 
+            background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px;
+        }
+        .color-item input[type="color"] {
+            width: 24px; height: 24px; padding: 0; border: none; 
+            border-radius: 50%; cursor: pointer; background: none; margin: 0;
+        }
+        .color-item input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        .color-item input[type="color"]::-webkit-color-swatch { border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; }
+
+        canvas { display: block; cursor: grab; }
+        canvas:active { cursor: grabbing; }
+
+        @media (max-width: 600px) {
+            #controls {
+                left: 10px; right: 10px; top: 10px;
+                width: auto; max-height: 50vh;
+            }
+            #controls.minimized { width: auto; }
+        }
+        
+        
+          #capa-autor {
+    position: absolute; /* Lo fija en la pantalla */
+    top: 15px;          /* Distancia desde arriba */
+    right: 20px;        /* Distancia desde la derecha */
+    background: rgba(255, 255, 255, 0.8); /* Fondo blanco semi-transparente */
+    padding: 10px 20px; /* Espacio interno */
+    border-radius: 5px; /* Bordes redondeados */
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1); /* Sombra suave */
+    z-index: 1000;      /* Se asegura de estar por encima de los dibujos */
+    border: 1px solid #ddd;
+}
+    </style>
+</head>
+<body>
+ <div id="capa-autor">
+    Alejandro de Haro García - 1º Bachillerato E
+    </div>
+
+    <canvas id="defaultCanvas0"></canvas>
+<div id="controls">
+    <div class="panel-header" id="headerToggle">
+        <h3>Teselaciones</h3>
+        <button id="toggleBtn">▲</button>
+    </div>
+    
+    <div id="controlsContent">
+        <label>Tipo de Teselación</label>
+        <select id="type">
+            <optgroup label="Mosaicos Nazaríes">
+                <option value="nazari_pajarita">La Pajarita (Nazarí)</option>
+                <option value="nazari_hueso">El Hueso (Nazarí)</option>
+            </optgroup>
+            <optgroup label="Regulares">
+                <option value="3.3.3.3.3.3">3.3.3.3.3.3 (Triangular)</option>
+                <option value="4.4.4.4">4.4.4.4 (Cuadrada)</option>
+                <option value="6.6.6">6.6.6 (Hexagonal)</option>
+            </optgroup>
+            <optgroup label="Semirregulares">
+                <option value="4.8.8">4.8.8 (Cuadrado Truncado)</option>
+                <option value="4.6.12">4.6.12 (Gran Rombitrihexagonal)</option>
+                <option value="3.12.12">3.12.12 (Hexagonal Truncado)</option>
+                <option value="3.3.3.4.4">3.3.3.4.4 (Triangular Elongado)</option>
+                <option value="3.3.3.3.6">3.3.3.3.6 (Hexagonal Romo)</option>
+                <option value="3.6.3.6">3.6.3.6 (Trihexagonal)</option>
+                <option value="3.3.4.3.4">3.3.4.3.4 (Cuadrado Romo)</option>
+                <option value="3.4.6.4">3.4.6.4 (Rombitrihexagonal)</option>
+            </optgroup>
+        </select>
+
+        <label>Colores (Personalizables)</label>
+        <div class="color-grid">
+            <div class="color-item"><input type="color" id="col3" value="#0ea5e9"> <span>Triángulos</span></div>
+            <div class="color-item"><input type="color" id="col4" value="#e11d48"> <span>Cuadrados</span></div>
+            <div class="color-item"><input type="color" id="col6" value="#d97706"> <span>Hexágonos</span></div>
+            <div class="color-item"><input type="color" id="col8" value="#10b981"> <span>Octógonos</span></div>
+            <div class="color-item"><input type="color" id="col12" value="#8b5cf6"> <span>Dodecágonos</span></div>
+            
+            <label>Visualización</label>
+		<button id="toggleFill" style="width: 100%; padding: 8px; background: #38bdf8; border: none; border-radius: 6px; color: #0f172a; font-weight: bold; cursor: pointer; margin-bottom: 15px;">
+    Ocultar Relleno (Esqueleto)
+</button>
+        </div>
+
+        <label>Tamaño del Lado (px)</label>
+        <input type="range" id="sideLength" min="30" max="150" value="60">
+
+        <label>Rotación (<span id="rotVal">0</span>°)</label>
+        <input type="range" id="rotation" min="0" max="360" value="0">
+        
+        <div class="hint" id="hintText"></div>
+    </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+(function() {
+
+	let showFill = true;                /*Activado autorrellenado de poligonos*/
+	
+    const cv = document.getElementById('canvas');
+    const ctx = cv.getContext('2d', { alpha: false });
+    
+    // Lógica de apertura/cierre del panel
+    const controls = document.getElementById('controls');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const headerToggle = document.getElementById('headerToggle');
+
+    function togglePanel() {
+        controls.classList.toggle('minimized');
+        toggleBtn.textContent = controls.classList.contains('minimized') ? '▼' : '▲';
+    }
+    
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePanel();
+    });
+    headerToggle.addEventListener('click', togglePanel);
+
+    const ui = {
+            toggleFill: document.getElementById('toggleFill'), /* Para botón de relleno de polígonos */
+
+        type: document.getElementById('type'),
+        sideLength: document.getElementById('sideLength'),
+        rotation: document.getElementById('rotation'),
+        rotVal: document.getElementById('rotVal'),
+
+        hint: document.getElementById('hintText'),
+        colors: {
+            3: document.getElementById('col3'),
+            4: document.getElementById('col4'),
+
+            6: document.getElementById('col6'),
+            8: document.getElementById('col8'),
+            12: document.getElementById('col12')
+            
+        }
+
+    };
+    
+    const PI = Math.PI;
+    const SQ3 = Math.sqrt(3);
+
+    const SQ2 = Math.sqrt(2);
+
+    const DESCRIPTIONS = {
+        'nazari_pajarita': '<strong>La Pajarita</strong><br>Polígono con lados curvos sobre red triangular.',
+        'nazari_hueso': '<strong>El Hueso</strong><br>Variación de red cuadrada con lados quebrados a 45º. Estilo Alhambra.',
+        '3.3.3.3.3.3': '<strong>Triangular</strong><br>6 Triángulos en cada vértice.',
+        '4.4.4.4': '<strong>Cuadrada</strong><br>4 Cuadrados en cada vértice.',
+
+        '6.6.6': '<strong>Hexagonal</strong><br>3 Hexágonos en cada vértice.',
+        '4.8.8': '<strong>Cuadrado Truncado</strong><br>Secuencia: Cuadrado, Octógono, Octógono.',
+        '4.6.12': '<strong>Gran Rombitrihexagonal</strong><br>Secuencia: Cuadrado, Hexágono, Dodecágono.',
+        '3.12.12': '<strong>Hexagonal Truncado</strong><br>Secuencia: Triángulo, Dodecágono, Dodecágono.',
+        '3.3.3.4.4': '<strong>Triangular Elongado</strong><br>Secuencia: 3 Triángulos, 2 Cuadrados.',
+        '3.3.3.3.6': '<strong>Hexagonal Romo</strong><br>Secuencia: 4 Triángulos, 1 Hexágono (Quiral).',
+        '3.6.3.6': '<strong>Trihexagonal</strong><br>Secuencia: Triángulo, Hexágono, Triángulo, Hexágono.',
+        '3.3.4.3.4': '<strong>Cuadrado Romo</strong><br>Secuencia: 3 Triángulos, 2 Cuadrados (Quiral).',
+        '3.4.6.4': '<strong>Rombitrihexagonal</strong><br>Secuencia: Triángulo, Cuadrado, Hexágono, Cuadrado.'
+    };
+
+    const ALHAMBRA_PALETTE = {
+        white: '#f2f2e5', black: '#202020', red: '#a63c26', green: '#4a6b3e', ochre: '#d9a031'
+    };
+
+    let offsetX = 0; let offsetY = 0;
+
+    let isDragging = false;
+    let lastX = 0; let lastY = 0;
+
+    // --- GEOMETRÍA ---
+    function tracePoly(cx, cy, n, side, rot) {
+        const R = side / (2 * Math.sin(PI/n));
+        ctx.beginPath();
+        for(let i=0; i<n; i++) {
+
+            const th = rot + i * (2*PI/n);
+            ctx.lineTo(cx + R*Math.cos(th), cy + R*Math.sin(th));
+        }
+
+        ctx.closePath();
+    }
+
+    function traceFreePoly(points) {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for(let i=1; i<points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+
+        }
+        ctx.closePath();
+    }
+
+    function tracePajarita(cx, cy, side, rot) {
+        const n = 3; const R = side / (2 * Math.sin(PI/n));
+        const verts = [];
+        for(let i=0; i<n; i++) {
+            const th = rot + i * (2*PI/n);
+            verts.push({ x: cx + R*Math.cos(th), y: cy + R*Math.sin(th) });
+        }
+        ctx.beginPath();
+
+        for(let i=0; i<3; i++) {
+            const p1 = verts[i]; const p2 = verts[(i+1)%3];
+            if(i===0) ctx.moveTo(p1.x, p1.y);
+            const dx = p2.x - p1.x; const dy = p2.y - p1.y;
+            const nx = -dy; const ny = dx;
+            const k = 0.25; 
+            const cp1x = p1.x + dx*0.33 + nx*k; const cp1y = p1.y + dy*0.33 + ny*k;
+
+            const cp2x = p1.x + dx*0.66 - nx*k; const cp2y = p1.y + dy*0.66 - ny*k;
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+        }
+        ctx.closePath();
+
+    }
+
+    function traceHueso(cx, cy, side, rot, type) {
+        const R = side / (2 * Math.sin(PI/4)); 
+
+        const verts = [];
+        for(let i=0; i<4; i++) {
+            const th = rot + i * (PI/2);
+            verts.push({ x: cx + R*Math.cos(th), y: cy + R*Math.sin(th) });
+
+        }
+        const drawFullTab = (p1, p2, mode) => {
+            const dx = p2.x - p1.x; const dy = p2.y - p1.y;
+            const len = Math.sqrt(dx*dx + dy*dy);
+            const ux = dx/len; const uy = dy/len;
+            const nx = -uy * mode; const ny = ux * mode;
+            const h = 0.25; 
+            const Ax = p1.x + (ux * 0.25 * len) + (nx * h * len);
+
+            const Ay = p1.y + (uy * 0.25 * len) + (ny * h * len);
+            const Bx = p1.x + (ux * 0.75 * len) + (nx * h * len);
+            const By = p1.y + (uy * 0.75 * len) + (ny * h * len);
+            ctx.lineTo(Ax, Ay); ctx.lineTo(Bx, By); ctx.lineTo(p2.x, p2.y);
+        };
+        ctx.beginPath();
+        ctx.moveTo(verts[0].x, verts[0].y);
+
+        if (type === 'v') { 
+            drawFullTab(verts[0], verts[1], -1); drawFullTab(verts[1], verts[2], 1);  
+            drawFullTab(verts[2], verts[3], -1); drawFullTab(verts[3], verts[0], 1);  
+        } else { 
+            drawFullTab(verts[0], verts[1], 1); drawFullTab(verts[1], verts[2], -1); 
+            drawFullTab(verts[2], verts[3], 1); drawFullTab(verts[3], verts[0], -1); 
+        }
+        ctx.closePath();
+    }
+
+    function drawPoly(cx, cy, n, side, rot, mode) {
+        tracePoly(cx, cy, n, side, rot);
+        if (mode === 'fill') { ctx.fillStyle = ui.colors[n].value; ctx.fill(); } else { ctx.stroke(); }
+    }
+
+    function render() {
+
+        cv.width = window.innerWidth;
+        cv.height = window.innerHeight;
+        const W = cv.width, H = cv.height;
+        const s = parseInt(ui.sideLength.value);
+
+        const rotDeg = parseInt(ui.rotation.value);
+        const type = ui.type.value;
+        ui.rotVal.innerText = rotDeg;
+
+        ui.hint.innerHTML = DESCRIPTIONS[type] || type;
+
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(0,0,W,H);
+        ctx.save();
+        ctx.translate(W/2, H/2);
+        ctx.rotate(rotDeg * PI / 180);
+        ctx.translate(offsetX, offsetY);
+
+        const diag = Math.sqrt(W*W + H*H);
+        /*ctx.strokeStyle = "rgba(0,0,0,0.5)";*/
+        // --- Configuración de estilo de línea dinámico ---
+if (!showFill) {
+    ctx.strokeStyle = "#00f2ff"; // Color cian brillante para el esqueleto
+    ctx.lineWidth = 2;           // Línea un poco más gruesa
+    ctx.shadowBlur = 10;         // Efecto de brillo (glow)
+    ctx.shadowColor = "#00f2ff";
+} else {
+    ctx.strokeStyle = "rgba(255,255,255,0.3)"; // Línea discreta cuando hay color
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 0;          // Sin brillo
+}
+// -------------------------------------------------
+        
+        
+        
+        /* ---------------------------------*/
+         // ctx.lineWidth = 1.5; Esta linea la he comentado
+
+        ctx.lineJoin = "round";
+        const renderMargin = Math.max(Math.abs(offsetX), Math.abs(offsetY)) + diag/2; 
+
+        if (type === 'nazari_pajarita') {
+
+            const h = s * SQ3 / 2;
+            const rx = Math.ceil(renderMargin/s) + 2; const ry = Math.ceil(renderMargin/h) + 2;
+            ['fill', 'stroke'].forEach(mode => {
+              if (mode === 'fill' && !showFill) return;
+                for(let y = -ry; y < ry; y++) {
+                    const xOff = (Math.abs(y)%2)*(s/2);
+                    for(let x = -rx; x < rx; x++) {
+                        const px = x*s + xOff;
+                        tracePajarita(px, y*h + h*2/3, s, -PI/2);
+                        if(mode==='fill') { ctx.fillStyle = ALHAMBRA_PALETTE.white; ctx.fill(); } else ctx.stroke();
+                        tracePajarita(px + s/2, y*h + h/3, s, PI/2);
+                        if(mode==='fill') { ctx.fillStyle = ALHAMBRA_PALETTE.red; ctx.fill(); } else ctx.stroke();
+                    }
+                }
+            });
+        }
+
+        else if (type === 'nazari_hueso') {
+            const rx = Math.ceil(renderMargin/s) + 2;
+            ['fill', 'stroke'].forEach(mode => {
+             if (mode === 'fill' && !showFill) return;
+                for(let y = -rx; y < rx; y++) {
+
+                    for(let x = -rx; x < rx; x++) {
+                        const isVertical = (Math.abs(x) + Math.abs(y)) % 2 === 0;
+                        traceHueso(x*s, y*s, s, PI/4, isVertical ? 'v' : 'h');
+                        if(mode==='fill') {
+
+                            if (isVertical) { ctx.fillStyle = (y % 2 === 0) ? ALHAMBRA_PALETTE.black : ALHAMBRA_PALETTE.red; } 
+                            else { ctx.fillStyle = (x % 2 === 0) ? ALHAMBRA_PALETTE.white : ALHAMBRA_PALETTE.green; }
+                            ctx.fill(); 
+                        } else ctx.stroke();
+                    }
+                }
+            });
+        }
+
+        else if (type === '3.3.3.3.3.3') {
+            const h = s * SQ3 / 2;
+            const rx = Math.ceil(renderMargin/s) + 2; const ry = Math.ceil(renderMargin/h) + 2;
+            ['fill', 'stroke'].forEach(mode => {
+          if (mode === 'fill' && !showFill) return;
+                for(let y = -ry; y < ry; y++) {
+                    const xOff = (Math.abs(y)%2)*(s/2);
+                    for(let x = -rx; x < rx; x++) {
+
+                        const px = x*s + xOff;
+                        drawPoly(px, y*h + h*2/3, 3, s, -PI/2, mode);
+                        drawPoly(px + s/2, y*h + h/3, 3, s, PI/2, mode);
+                    }
+                }
+            });
+        } 
+        else if (type === '4.4.4.4') {
+            const rx = Math.ceil(renderMargin/s) + 2;
+            ['fill', 'stroke'].forEach(mode => {
+          if (mode === 'fill' && !showFill) return;
+                for(let y = -rx; y < rx; y++) {
+                    for(let x = -rx; x < rx; x++) {
+                        drawPoly(x*s, y*s, 4, s, PI/4, mode);
+                    }
+                }
+            });
+
+        }
+        else if (type === '6.6.6') {
+            const dx = s*SQ3; const dy = s*1.5;
+            const rx = Math.ceil(renderMargin/dx) + 2; const ry = Math.ceil(renderMargin/dy) + 2;
+
+            ['fill', 'stroke'].forEach(mode => {
+                if (mode === 'fill' && !showFill) return;
+                for(let y = -ry; y < ry; y++) {
+                    const xOff = (Math.abs(y)%2)*(dx/2);
+
+                    for(let x = -rx; x < rx; x++) {
+                        drawPoly(x*dx + xOff, y*dy, 6, s, PI/6, mode);
+                    }
+                }
+            });
+        }
+        else if (type === '3.3.3.4.4') {
+            const hTri = s * SQ3 / 2;
+
+            const hUnit = s + hTri;
+            const rx = Math.ceil(renderMargin/s) + 2; const ry = Math.ceil(renderMargin/hUnit) + 2;
+            ['fill', 'stroke'].forEach(mode => {
+               if (mode === 'fill' && !showFill) return;
+                for(let j = -ry; y = -ry, j < ry; j++) {
+                    const rowShift = (Math.abs(j) % 2) * (s/2);
+                    const yBase = j * hUnit;
+                    for(let i = -rx; i < rx; i++) {
+                        const cx = i * s + rowShift;
+
+                        drawPoly(cx, yBase, 4, s, PI/4, mode);
+                        drawPoly(cx, yBase - s/2 - hTri/3, 3, s, -PI/2, mode);
+                        drawPoly(cx + s/2, yBase - s/2 - 2*hTri/3, 3, s, PI/2, mode);
+                    }
+                }
+            });
+        }
+        else if (type === '3.3.3.3.6') {
+            const ux = s * SQ3; const uy = 2 * s;
+            const vx = -s * SQ3 / 2; const vy = 2.5 * s;
+            const latticeDist = Math.sqrt(ux*ux + uy*uy); 
+            const steps = Math.ceil(renderMargin / latticeDist) + 2;
+            const baseFaceTri = [{x: s*SQ3/2, y: -s/2}, {x: s*SQ3/2, y: s/2}, {x: s*SQ3, y: 0}];
+            const baseGapTri = [{x: s*SQ3, y: 0}, {x: s*SQ3/2, y: s/2}, {x: s*SQ3, y: s}];
+            ['fill', 'stroke'].forEach(mode => {
+		if (mode === 'fill' && !showFill) return;
+                for(let r = -steps; r < steps; r++) {
+                    for(let q = -steps; q < steps; q++) {
+                        const cx = q * ux + r * vx;
+
+                        const cy = q * uy + r * vy;
+
+                        drawPoly(cx, cy, 6, s, -PI/2, mode);
+                        for(let i=0; i<6; i++) {
+                            const ang = i * PI/3; const cosA = Math.cos(ang); const sinA = Math.sin(ang);
+                            const pts1 = baseFaceTri.map(p => ({x: cx + (p.x*cosA - p.y*sinA), y: cy + (p.x*sinA + p.y*cosA)}));
+
+                            traceFreePoly(pts1); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+                        }
+                        for(let i=0; i<6; i++) {
+                            const ang = i * PI/3; const cosA = Math.cos(ang); const sinA = Math.sin(ang);
+
+                            const pts2 = baseGapTri.map(p => ({x: cx + (p.x*cosA - p.y*sinA), y: cy + (p.x*sinA + p.y*cosA)}));
+                            traceFreePoly(pts2); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+                        }
+                    }
+                }
+            });
+        }
+        else if (type === '3.3.4.3.4') {
+            const k = s * (1 + SQ3/2);
+            const h = s/2;
+            const ux = k; const uy = -h;
+            const vx = h; const vy = k;
+            const latticeDist = Math.sqrt(ux*ux + uy*uy);
+            const steps = Math.ceil(renderMargin / latticeDist) + 2;
+            ['fill', 'stroke'].forEach(mode => {
+		if (mode === 'fill' && !showFill) return;
+                for(let r = -steps; r < steps; r++) {
+                    for(let q = -steps; q < steps; q++) {
+                        const ox = q * ux + r * vx;
+                        const oy = q * uy + r * vy;
+                        const pts1 = [{x: ox, y: oy}, {x: ox + s, y: oy}, {x: ox + s, y: oy + s}, {x: ox, y: oy + s}];
+                        traceFreePoly(pts1); if(mode==='fill') {ctx.fillStyle=ui.colors[4].value;ctx.fill();} else ctx.stroke();
+                        const pts2 = [{x: ox + s, y: oy + s}, {x: ox + s + s*SQ3/2, y: oy + h}, {x: ox + s + s*SQ3/2 + h, y: oy + h + s*SQ3/2}, {x: ox + s + h, y: oy + s + s*SQ3/2}];
+                        traceFreePoly(pts2); if(mode==='fill') {ctx.fillStyle=ui.colors[4].value;ctx.fill();} else ctx.stroke();
+                        const pts3 = [{x: ox + k, y: oy + h}, {x: ox + k + s, y: oy + h}, {x: ox + k + s, y: oy - h}, {x: ox + k, y: oy - h}];
+                        traceFreePoly(pts3); if(mode==='fill') {ctx.fillStyle=ui.colors[4].value;ctx.fill();} else ctx.stroke();
+                        const pts4 = [{x: ox + s, y: oy}, {x: ox + s + s*SQ3/2, y: oy - h}, {x: ox + h + s*SQ3/2, y: oy - s*SQ3/2 - h}, {x: ox + h, y: oy - s*SQ3/2}];
+                        traceFreePoly(pts4); if(mode==='fill') {ctx.fillStyle=ui.colors[4].value;ctx.fill();} else ctx.stroke();
+                        const tTop1 = [{x: ox, y: oy}, {x: ox + s, y: oy}, {x: ox + s/2, y: oy - s*SQ3/2}];
+                        traceFreePoly(tTop1); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+                        const tBot1 = [{x: ox, y: oy + s}, {x: ox + s, y: oy + s}, {x: ox + s/2, y: oy + s + s*SQ3/2}];
+                        traceFreePoly(tBot1); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+
+                        const tLeft1 = [{x: ox, y: oy}, {x: ox, y: oy + s}, {x: ox - s*SQ3/2, y: oy + s/2}];
+                        traceFreePoly(tLeft1); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+                        const tRight1 = [{x: ox + s, y: oy + s}, {x: ox + s, y: oy}, {x: ox + s + s*SQ3/2, y: oy + s/2}];
+                        traceFreePoly(tRight1); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+
+                        const s3x = ox + k; const s3yTop = oy + h; const s3yBot = oy - h;
+                        const tTop3 = [{x: s3x, y: s3yTop}, {x: s3x + s, y: s3yTop}, {x: s3x + s/2, y: s3yTop + s*SQ3/2}];
+                        traceFreePoly(tTop3); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+
+                        const tBot3 = [{x: s3x + s, y: s3yBot}, {x: s3x, y: s3yBot}, {x: s3x + s/2, y: s3yBot - s*SQ3/2}];
+                        traceFreePoly(tBot3); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+                        const tLeft3 = [{x: s3x, y: s3yBot}, {x: s3x, y: s3yTop}, {x: s3x - s*SQ3/2, y: oy}];
+                        traceFreePoly(tLeft3); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+                        const tRight3 = [{x: s3x + s, y: s3yTop}, {x: s3x + s, y: s3yBot}, {x: s3x + s + s*SQ3/2, y: oy}];
+                        traceFreePoly(tRight3); if(mode==='fill') {ctx.fillStyle=ui.colors[3].value;ctx.fill();} else ctx.stroke();
+                    }
+                }
+            });
+        }
+        else if (type === '3.4.6.4') {
+            const D = s * (1 + SQ3);
+            const ux = D; const uy = 0;
+            const vx = D / 2; const vy = D * SQ3 / 2;
+            const latticeDist = D; 
+            const steps = Math.ceil(renderMargin / latticeDist) + 2;
+            const dSq = (s/2) * (SQ3 + 1); 
+            const dTri = s * (1 + 1/SQ3); 
+            ['fill', 'stroke'].forEach(mode => {
+            if (mode === 'fill' && !showFill) return;
+                for(let r = -steps; r < steps; r++) {
+                    for(let q = -steps; q < steps; q++) {
+                        const cx = q * ux + r * vx;
+                        const cy = q * uy + r * vy;
+
+                        drawPoly(cx, cy, 6, s, -PI/2, mode);
+                        for(let i=0; i<6; i++) {
+                            const ang = i * PI/3; const sx = cx + dSq * Math.cos(ang); const sy = cy + dSq * Math.sin(ang);
+                            drawPoly(sx, sy, 4, s, ang + PI/4, mode);
+
+                        }
+                        for(let i=0; i<6; i++) {
+                            const ang = PI/6 + i * PI/3; const tx = cx + dTri * Math.cos(ang); const ty = cy + dTri * Math.sin(ang);
+                            drawPoly(tx, ty, 3, s, ang + PI, mode);
+
+                        }
+                    }
+                }
+            });
+
+        }
+        else if (type === '3.6.3.6') {
+            const ux = 2 * s; const uy = 0;
+            const vx = s; const vy = s * SQ3;
+            const latticeDist = 2 * s;
+            const steps = Math.ceil(renderMargin / latticeDist) + 2;
+
+            ['fill', 'stroke'].forEach(mode => {
+               if (mode === 'fill' && !showFill) return;
+                for(let r = -steps; r < steps; r++) {
+                    for(let q = -steps; q < steps; q++) {
+                        const cx = q * ux + r * vx;
+                        const cy = q * uy + r * vy;
+                        drawPoly(cx, cy, 6, s, 0, mode);
+
+                        const t1x = cx + s;
+                        const t1y = cy + s * SQ3 / 3; // Triángulo punta arriba
+                        drawPoly(t1x, t1y, 3, s, -PI/2, mode);
+                        const t2x = cx + s;
+                        const t2y = cy - s * SQ3 / 3; // Triángulo punta abajo
+                        drawPoly(t2x, t2y, 3, s, PI/2, mode);
+                    }
+                }
+            });
+        }
+        else if (type === '3.12.12') {
+            const D = s * (2 + SQ3);
+            const ux = D; const uy = 0;
+            const vx = D / 2; const vy = D * SQ3 / 2;
+            const latticeDist = D; 
+
+            const steps = Math.ceil(renderMargin / latticeDist) + 2;
+            const dTri = D / SQ3; 
+            ['fill', 'stroke'].forEach(mode => {
+               if (mode === 'fill' && !showFill) return;
+                for(let r = -steps; r < steps; r++) {
+
+                    for(let q = -steps; q < steps; q++) {
+                        const cx = q * ux + r * vx;
+                        const cy = q * uy + r * vy;
+                        drawPoly(cx, cy, 12, s, -PI/12, mode);
+
+                        const t1x = cx + dTri * Math.cos(PI/6);
+                        const t1y = cy + dTri * Math.sin(PI/6);
+                        drawPoly(t1x, t1y, 3, s, PI/6, mode);
+                        const t2x = cx + dTri * Math.cos(PI/2);
+
+                        const t2y = cy + dTri * Math.sin(PI/2);
+                        drawPoly(t2x, t2y, 3, s, PI/2, mode);
+                    }
+
+                }
+            });
+        }
+        else if (type === '4.6.12') {
+            const D = s * (3 + SQ3);
+            const ux = D; const uy = 0;
+            const vx = D / 2; const vy = D * SQ3 / 2;
+            const latticeDist = D;
+            const steps = Math.ceil(renderMargin / latticeDist) + 2;
+            const ap12 = s/2 * (2+SQ3);
+            const ap6 = s/2 * SQ3;
+            const ap4 = s/2;
+
+            const dSq = ap12 + ap4; 
+            const dHex = ap12 + ap6; 
+            ['fill', 'stroke'].forEach(mode => {
+               if (mode === 'fill' && !showFill) return;
+                for(let r = -steps; r < steps; r++) {
+                    for(let q = -steps; q < steps; q++) {
+                        const cx = q * ux + r * vx;
+                        const cy = q * uy + r * vy;
+                        drawPoly(cx, cy, 12, s, -PI/12, mode);
+
+                        for(let i=0; i<6; i++) {
+                            const ang = i * PI/3; 
+                            const sx = cx + dSq * Math.cos(ang);
+                            const sy = cy + dSq * Math.sin(ang);
+
+                            drawPoly(sx, sy, 4, s, ang + PI/4, mode);
+                        }
+                        for(let i=0; i<6; i++) {
+
+                            const ang = PI/6 + i * PI/3; 
+                            const hx = cx + dHex * Math.cos(ang);
+                            const hy = cy + dHex * Math.sin(ang);
+                            drawPoly(hx, hy, 6, s, 0, mode);
+
+                        }
+                    }
+                }
+            });
+        }
+        else if (type === '4.8.8') {
+            const ap8 = s/2 * (1 + SQ2);
+            const D = 2 * ap8;
+
+            const ux = D; const uy = 0;
+            const vx = 0; const vy = D;
+            const latticeDist = D;
+            const steps = Math.ceil(renderMargin / latticeDist) + 2;
+            ['fill', 'stroke'].forEach(mode => {
+              if (mode === 'fill' && !showFill) return;
+                for(let r = -steps; r < steps; r++) {
+                    for(let q = -steps; q < steps; q++) {
+                        const cx = q * ux + r * vx;
+                        const cy = q * uy + r * vy;
+                        drawPoly(cx, cy, 8, s, PI/8, mode);
+                        drawPoly(cx + D/2, cy + D/2, 4, s, 0, mode);
+                    }
+                }
+            });
+        }
+
+
+        ctx.restore();
+    }
+
+    cv.addEventListener('mousedown', e => {
+        isDragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+
+        cv.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', e => {
+
+        if (!isDragging) return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        const rotRad = parseInt(ui.rotation.value) * PI / 180;
+
+        const dOx = dx * Math.cos(-rotRad) - dy * Math.sin(-rotRad);
+        const dOy = dx * Math.sin(-rotRad) + dy * Math.cos(-rotRad);
+        offsetX += dOx;
+        offsetY += dOy;
+
+        lastX = e.clientX;
+        lastY = e.clientY;
+        render();
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; cv.style.cursor = 'grab'; });
+    cv.addEventListener('touchstart', e => {
+        if (e.touches.length === 1) {
+            isDragging = true;
+            lastX = e.touches[0].clientX;
+            lastY = e.touches[0].clientY;
+        }
+    });
+    window.addEventListener('touchmove', e => {
+        if (!isDragging) return;
+        if (e.touches.length === 1) {
+            const dx = e.touches[0].clientX - lastX;
+            const dy = e.touches[0].clientY - lastY;
+            const rotRad = parseInt(ui.rotation.value) * PI / 180;
+
+            const dOx = dx * Math.cos(-rotRad) - dy * Math.sin(-rotRad);
+            const dOy = dx * Math.sin(-rotRad) + dy * Math.cos(-rotRad);
+            offsetX += dOx;
+            offsetY += dOy;
+
+            lastX = e.touches[0].clientX;
+            lastY = e.touches[0].clientY;
+            render();
+            e.preventDefault();
+
+        }
+    });
+    window.addEventListener('touchend', () => isDragging = false);
+
+    window.addEventListener('wheel', e => {
+        e.preventDefault();
+        const delta = Math.sign(e.deltaY) * -5;
+        let val = parseInt(ui.sideLength.value) + delta;
+        val = Math.max(30, Math.min(150, val));
+        ui.sideLength.value = val;
+        render();
+    }, { passive: false });
+
+
+    ui.type.addEventListener('input', render);
+    ui.sideLength.addEventListener('input', render);
+    ui.rotation.addEventListener('input', render);
+
+    Object.values(ui.colors).forEach(input => input.addEventListener('input', render));
+    window.addEventListener('resize', render);
+    render();
+    
+    /* Para rellenado de poligonos*/
+    ui.toggleFill.addEventListener('click', () => {
+    showFill = !showFill; // Cambia el estado (si/no)
+    ui.toggleFill.textContent = showFill ? "Ocultar Relleno (Esqueleto)" : "Mostrar Colores";
+    ui.toggleFill.style.background = showFill ? "#38bdf8" : "#94a3b8";
+    render(); // Redibuja la escena
+});
+    
+})();
+</script>
+</body>
+</html>
